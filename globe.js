@@ -3,8 +3,11 @@ import * as THREE from 'three';
 (async () => {
   // ── LOCATIONS ─────────────────────────────────────────────────────────────
   const LOCATIONS = [
-    { name: 'Tarifa',    lat: 36.01, lng: -5.60 },
-    { name: 'Bruxelles', lat: 50.85, lng:  4.35 },
+    { name: 'Tarifa',          lat:  36.01, lng:   -5.60 },
+    { name: 'Bruxelles',       lat:  50.85, lng:    4.35 },
+    { name: 'Tatajuba, Ceará', lat:  -2.85, lng:  -40.25 },
+    { name: 'Phan Rang',       lat:  11.57, lng:  108.99 },
+    { name: 'Maui',            lat:  20.80, lng: -156.33 },
   ];
 
   // ── SCENE ──────────────────────────────────────────────────────────────────
