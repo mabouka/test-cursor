@@ -10,16 +10,16 @@ import * as THREE from 'three';
   // ── SCENE ──────────────────────────────────────────────────────────────────
   const canvas  = document.getElementById('globe-canvas');
   const tooltip = document.getElementById('globe-tooltip');
-  const SIZE = 900;
-  canvas.width  = SIZE;
-  canvas.height = SIZE;
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width  = W;
+  canvas.height = H;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(SIZE, SIZE);
+  renderer.setSize(W, H);
 
   const scene  = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
   camera.position.set(0, 0, 3.0);
 
   scene.add(new THREE.AmbientLight(0xffffff, 2.5));
@@ -50,22 +50,6 @@ import * as THREE from 'three';
        r * Math.cos(phi),
        r * Math.sin(phi) * Math.sin(theta)
     );
-  }
-
-  // ── GRID LINES ─────────────────────────────────────────────────────────────
-  const gridMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 });
-
-  // Longitude lines
-  for (let lon = -180; lon < 180; lon += 20) {
-    const pts = [];
-    for (let lat = -90; lat <= 90; lat += 2) pts.push(ll3d(lon, lat));
-    globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
-  }
-  // Latitude lines
-  for (let lat = -80; lat <= 80; lat += 20) {
-    const pts = [];
-    for (let lon = -180; lon <= 180; lon += 2) pts.push(ll3d(lon, lat));
-    globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
   }
 
   // ── CONTINENT COASTLINES (no country borders) ─────────────────────────────
@@ -151,6 +135,14 @@ import * as THREE from 'three';
     }
   });
   canvas.addEventListener('mouseleave', () => { tooltip.style.opacity = '0'; });
+
+  // ── RESIZE ────────────────────────────────────────────────────────────────
+  window.addEventListener('resize', () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
 
   // ── RENDER LOOP ───────────────────────────────────────────────────────────
   function animate() {
