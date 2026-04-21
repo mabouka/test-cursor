@@ -13,17 +13,16 @@ import * as THREE from 'three';
   // ── SCENE ──────────────────────────────────────────────────────────────────
   const canvas  = document.getElementById('globe-canvas');
   const tooltip = document.getElementById('globe-tooltip');
-  const W = window.innerWidth, H = window.innerHeight;
-  canvas.width  = W;
-  canvas.height = H;
+  const S = window.innerHeight;
+  canvas.width  = S;
+  canvas.height = S;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(W, H);
+  renderer.setSize(S, S);
 
   const scene  = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
-  // shifted left so globe sits right, z increased ~25% → globe 20% smaller
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
   camera.position.set(0, 0, 3.75);
   camera.lookAt(0, 0, 0);
 
@@ -143,10 +142,9 @@ import * as THREE from 'three';
 
   // ── RESIZE ────────────────────────────────────────────────────────────────
   window.addEventListener('resize', () => {
-    const w = window.innerWidth, h = window.innerHeight;
-    camera.aspect = w / h;
+    const s = window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
+    renderer.setSize(s, s);
   });
 
   // ── RENDER LOOP ───────────────────────────────────────────────────────────
