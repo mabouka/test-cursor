@@ -3,22 +3,8 @@ import * as THREE from 'three';
 (async () => {
   // ── LOCATIONS ─────────────────────────────────────────────────────────────
   const LOCATIONS = [
-    { name: 'Istanbul',   lat: 41.01, lng: 28.95 },
-    { name: 'London',     lat: 51.51, lng: -0.13 },
-    { name: 'Amsterdam',  lat: 52.37, lng:  4.89 },
-    { name: 'Berlin',     lat: 52.52, lng: 13.40 },
-    { name: 'Warsaw',     lat: 52.23, lng: 21.01 },
-    { name: 'Budapest',   lat: 47.50, lng: 19.04 },
-    { name: 'Bucharest',  lat: 44.43, lng: 26.10 },
-    { name: 'Sofia',      lat: 42.70, lng: 23.32 },
-    { name: 'Belgrade',   lat: 44.80, lng: 20.46 },
-    { name: 'Athens',     lat: 37.98, lng: 23.73 },
-    { name: 'Kyiv',       lat: 50.45, lng: 30.52 },
-    { name: 'Moscow',     lat: 55.75, lng: 37.62 },
-    { name: 'Baku',       lat: 40.41, lng: 49.87 },
-    { name: 'Dubai',      lat: 25.20, lng: 55.27 },
-    { name: 'Tel Aviv',   lat: 32.09, lng: 34.79 },
-    { name: 'Tbilisi',    lat: 41.69, lng: 44.83 },
+    { name: 'Tarifa',    lat: 36.01, lng: -5.60 },
+    { name: 'Bruxelles', lat: 50.85, lng:  4.35 },
   ];
 
   // ── SCENE ──────────────────────────────────────────────────────────────────
