@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 (() => {
   // ── LOCATIONS (Europe / Turkey / Middle East focus) ──────────────────────────
   const LOCATIONS = [

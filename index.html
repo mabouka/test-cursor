@@ -14,7 +14,9 @@
       <div class="globe-tooltip" id="globe-tooltip"></div>
     </div>
   </section>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="globe.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "/node_modules/three/build/three.module.min.js" } }
+  </script>
+  <script type="module" src="globe.js"></script>
 </body>
 </html>
