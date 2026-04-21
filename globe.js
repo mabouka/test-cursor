@@ -79,12 +79,36 @@ import * as THREE from 'three';
   });
 
   // ── DRAG + AUTO-ROTATE ────────────────────────────────────────────────────
+  const raycaster = new THREE.Raycaster();
+  const mouse2d   = new THREE.Vector2();
+
   let rotY = -1.83, rotX = 0.60;
   let isDragging = false, prev = { x: 0, y: 0 };
   let autoRotate = true, idleTimer = null;
+  let targetX = null, targetY = null; // for click-to-center animation
+
+  function centerOn(lat, lng) {
+    autoRotate = false;
+    clearTimeout(idleTimer);
+    targetX = lat  * Math.PI / 180;
+    targetY = Math.PI / 2 - (lng + 180) * Math.PI / 180;
+    idleTimer = setTimeout(() => { autoRotate = true; }, 4000);
+  }
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse2d.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+    mouse2d.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse2d, camera);
+    const hits = raycaster.intersectObjects(markerObjects.map(m => m.dot));
+    if (hits.length) {
+      const loc = markerObjects[markerObjects.map(m=>m.dot).indexOf(hits[0].object)].loc;
+      centerOn(loc.lat, loc.lng);
+    }
+  });
 
   canvas.addEventListener('mousedown', e => {
-    isDragging = true; autoRotate = false;
+    isDragging = true; autoRotate = false; targetX = null; targetY = null;
     clearTimeout(idleTimer); prev = { x: e.clientX, y: e.clientY };
   });
   window.addEventListener('mouseup', () => {
@@ -115,9 +139,6 @@ import * as THREE from 'three';
   }, { passive: true });
 
   // ── TOOLTIP ───────────────────────────────────────────────────────────────
-  const raycaster = new THREE.Raycaster();
-  const mouse2d   = new THREE.Vector2();
-
   canvas.addEventListener('mousemove', e => {
     const rect = canvas.getBoundingClientRect();
     mouse2d.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
@@ -150,7 +171,15 @@ import * as THREE from 'three';
   // ── RENDER LOOP ───────────────────────────────────────────────────────────
   function animate() {
     requestAnimationFrame(animate);
-    if (autoRotate) rotY += 0.0015;
+    if (targetX !== null) {
+      rotX += (targetX - rotX) * 0.05;
+      rotY += (targetY - rotY) * 0.05;
+      if (Math.abs(targetX - rotX) < 0.001 && Math.abs(targetY - rotY) < 0.001) {
+        rotX = targetX; rotY = targetY; targetX = null; targetY = null;
+      }
+    } else if (autoRotate) {
+      rotY += 0.0015;
+    }
     globe.rotation.set(rotX, rotY, 0);
     renderer.render(scene, camera);
   }
