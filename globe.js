@@ -68,17 +68,6 @@ import * as THREE from 'three';
     globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gridMat));
   }
 
-  // ── COUNTRY BORDERS from real Natural Earth 50m data ──────────────────────
-  const borderMat = new THREE.LineBasicMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0.75 });
-
-  const rings = await fetch('/world-borders.json').then(r => r.json());
-  for (const ring of rings) {
-    const pts = ring.map(([lon, lat]) => ll3d(lon, lat, 1.0015));
-    if (pts.length < 2) continue;
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    globe.add(new THREE.Line(geo, borderMat));
-  }
-
   // ── LOCATION MARKERS ──────────────────────────────────────────────────────
   const dotGeo = new THREE.SphereGeometry(0.020, 12, 12);
   const markerObjects = [];
