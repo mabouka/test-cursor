@@ -24,7 +24,7 @@ import * as THREE from 'three';
   const scene  = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
   // shifted left so globe sits right, z increased ~25% → globe 20% smaller
-  camera.position.set(-2.0, 0, 3.75);
+  camera.position.set(0, 0, 3.75);
   camera.lookAt(0, 0, 0);
 
   scene.add(new THREE.AmbientLight(0xffffff, 2.5));
