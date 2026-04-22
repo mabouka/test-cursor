@@ -20,12 +20,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'CF7_GA4_MEASUREMENT_ID', defined( 'GA4_MEASUREMENT_ID' ) ? GA4_MEASUREMENT_ID : 'G-XXXXXXXXXX' );
 define( 'CF7_GA4_API_SECRET',     defined( 'GA4_API_SECRET' )     ? GA4_API_SECRET     : 'VOTRE_API_SECRET' );
 
-// IDs de formulaires CF7 et nom d'événement associé.
-// Clé = ID du formulaire CF7 (visible dans WP Admin → Contact → Formulaires).
-// Valeur = nom de l'événement GA4 (snake_case, max 40 caractères).
-$cf7_ga4_form_map = [
-    1 => 'contact_us_form_submit',   // formulaire "Nous contacter"
-    2 => 'job_application_submit',   // formulaire "Candidature"
+// Nom du champ checkbox dans CF7 (attribut "name" de la balise [checkbox ...]).
+define( 'CF7_GA4_CHECKBOX_FIELD', 'your-request-type' );
+
+// Correspondance valeur de checkbox → nom d'événement GA4.
+// Adaptez les clés selon les valeurs réelles de votre checkbox CF7.
+$cf7_ga4_checkbox_event_map = [
+    'job'           => 'job_application_submit',
+    'collaboration' => 'contact_us_form_submit',
+    'projet'        => 'contact_us_form_submit',
 ];
 
 // ─── Hook CF7 ─────────────────────────────────────────────────────────────────
@@ -33,10 +36,26 @@ $cf7_ga4_form_map = [
 add_action( 'wpcf7_mail_sent', 'cf7_ga4_send_event' );
 
 function cf7_ga4_send_event( $contact_form ) {
-    global $cf7_ga4_form_map;
+    global $cf7_ga4_checkbox_event_map;
 
     $form_id    = (int) $contact_form->id();
-    $event_name = $cf7_ga4_form_map[ $form_id ] ?? 'cf7_form_submit';
+    $submission = WPCF7_Submission::get_instance();
+
+    // Lit la valeur de la case à cocher soumise.
+    $checkbox_value = '';
+    if ( $submission ) {
+        $raw = $submission->get_posted_data( CF7_GA4_CHECKBOX_FIELD );
+        // get_posted_data retourne un tableau pour les checkboxes.
+        if ( is_array( $raw ) ) {
+            $checkbox_value = implode( ',', array_map( 'sanitize_text_field', $raw ) );
+        } else {
+            $checkbox_value = sanitize_text_field( (string) $raw );
+        }
+    }
+
+    // Détermine le nom d'événement GA4 selon la valeur cochée.
+    $first_value = strtolower( explode( ',', $checkbox_value )[0] );
+    $event_name  = $cf7_ga4_checkbox_event_map[ $first_value ] ?? 'cf7_form_submit';
 
     // Récupère le client_id depuis le cookie GA4 (_ga), sinon génère un ID aléatoire.
     $client_id = cf7_ga4_get_client_id();
@@ -53,9 +72,9 @@ function cf7_ga4_send_event( $contact_form ) {
             [
                 'name'   => $event_name,
                 'params' => [
-                    'form_id'    => $form_id,
-                    'form_title' => $contact_form->title(),
-                    // Ajoute d'autres paramètres ici si nécessaire.
+                    'form_id'        => $form_id,
+                    'form_title'     => $contact_form->title(),
+                    'request_type'   => $checkbox_value, // valeur brute de la checkbox
                 ],
             ],
         ],
