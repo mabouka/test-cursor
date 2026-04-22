@@ -1,16 +1,8 @@
 <?php
-/**
- * Plugin Name: CF7 GA4 Server-Side Tracking
- * Description: Envoie un événement GA4 via Measurement Protocol lors de l'envoi d'un formulaire Contact Form 7.
- * Version: 1.0.0
- */
-
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
-
-// ─── Configuration ────────────────────────────────────────────────────────────
-// Remplacez ces valeurs ou définissez-les dans wp-config.php :
+// ─── CF7 → GA4 Measurement Protocol ──────────────────────────────────────────
+// À coller dans functions.php du thème.
+//
+// Prérequis : définir dans wp-config.php :
 //   define( 'GA4_MEASUREMENT_ID', 'G-XXXXXXXXXX' );
 //   define( 'GA4_API_SECRET',     'xxxxxxxxxxxxxxxxxxxx' );
 //
