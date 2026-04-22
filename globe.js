@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 (async () => {
-  // ── LOCATIONS ─────────────────────────────────────────────────────────────
   const LOCATIONS = [
     { name: 'Tarifa',          lat:  36.01, lng:   -5.60 },
     { name: 'Bruxelles',       lat:  50.85, lng:    4.35 },
@@ -14,39 +13,61 @@ import * as THREE from 'three';
   const canvas  = document.getElementById('globe-canvas');
   const tooltip = document.getElementById('globe-tooltip');
   const S = window.innerHeight;
-  canvas.width  = S;
-  canvas.height = S;
+  canvas.width = canvas.height = S;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(S, S);
 
   const scene  = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(0, 0, 3.75);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0.15, 2.6);
   camera.lookAt(0, 0, 0);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 2.5));
-  const key = new THREE.DirectionalLight(0xffffff, 0.35);
-  key.position.set(4, 2, 5);
-  scene.add(key);
+  // Subtle top light
+  scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+  const keyLight = new THREE.DirectionalLight(0x8899bb, 1.2);
+  keyLight.position.set(2, 4, 3);
+  scene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x223344, 0.8);
+  rimLight.position.set(-3, -1, -3);
+  scene.add(rimLight);
 
-  // ── GLOBE SPHERE (solid dark) ──────────────────────────────────────────────
+  // ── DARK SPHERE ────────────────────────────────────────────────────────────
   const globe = new THREE.Mesh(
     new THREE.SphereGeometry(1, 80, 80),
-    new THREE.MeshPhongMaterial({ color: 0x1c1c1c, specular: 0x050505, shininess: 4 })
+    new THREE.MeshPhongMaterial({
+      color:    0x0c0c0e,
+      emissive: 0x08080c,
+      specular: 0x1a2030,
+      shininess: 12,
+    })
   );
   scene.add(globe);
 
-  // Subtle edge atmosphere
-  const atmosMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(1.035, 64, 64),
-    new THREE.MeshPhongMaterial({ color: 0x555555, transparent: true, opacity: 0.06, side: THREE.BackSide })
-  );
-  scene.add(atmosMesh);
+  // ── ATMOSPHERE HALO ────────────────────────────────────────────────────────
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1.055, 64, 64),
+    new THREE.MeshPhongMaterial({
+      color: 0x1a2035,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.BackSide,
+    })
+  ));
+  // second, tighter glow ring
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1.022, 64, 64),
+    new THREE.MeshPhongMaterial({
+      color: 0x2a3555,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+    })
+  ));
 
   // ── COORDINATE HELPER ─────────────────────────────────────────────────────
-  function ll3d(lon, lat, r = 1.001) {
+  function ll3d(lon, lat, r = 1.002) {
     const phi   = (90 - lat)  * Math.PI / 180;
     const theta = (lon + 180) * Math.PI / 180;
     return new THREE.Vector3(
@@ -56,36 +77,79 @@ import * as THREE from 'three';
     );
   }
 
-  // ── CONTINENT COASTLINES (no country borders) ─────────────────────────────
-  const borderMat = new THREE.LineBasicMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0.75 });
-
+  // ── LAND DETECTION (rasterise world-borders onto canvas) ──────────────────
   const rings = await fetch('/world-borders.json').then(r => r.json());
+
+  const LW = 2048, LH = 1024;
+  const landCanvas = document.createElement('canvas');
+  landCanvas.width = LW; landCanvas.height = LH;
+  const lctx = landCanvas.getContext('2d');
+  lctx.fillStyle = '#000';
+  lctx.fillRect(0, 0, LW, LH);
+  lctx.fillStyle = '#fff';
   for (const ring of rings) {
-    const pts = ring.map(([lon, lat]) => ll3d(lon, lat, 1.0015));
-    if (pts.length < 2) continue;
-    globe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), borderMat));
+    lctx.beginPath();
+    ring.forEach(([lon, lat], i) => {
+      const x = (lon + 180) / 360 * LW;
+      const y = (90 - lat)  / 180 * LH;
+      i === 0 ? lctx.moveTo(x, y) : lctx.lineTo(x, y);
+    });
+    lctx.closePath();
+    lctx.fill();
+  }
+  const pixels = lctx.getImageData(0, 0, LW, LH).data;
+
+  function isLand(lon, lat) {
+    const x = Math.min(LW - 1, Math.max(0, Math.round((lon + 180) / 360 * LW)));
+    const y = Math.min(LH - 1, Math.max(0, Math.round((90 - lat)  / 180 * LH)));
+    return pixels[(y * LW + x) * 4] > 128;
   }
 
-  // ── LOCATION MARKERS ──────────────────────────────────────────────────────
-  const dotGeo = new THREE.SphereGeometry(0.020, 12, 12);
-  const markerObjects = [];
+  // ── DOTTED CONTINENT GRID (InstancedMesh) ─────────────────────────────────
+  const STEP = 1.6;
+  const landPts = [];
+  for (let lat = -80; lat <= 80; lat += STEP) {
+    // slightly reduce longitude step near equator so dots look uniform in size
+    const lonStep = STEP / Math.cos(lat * Math.PI / 180) * 0.85;
+    for (let lon = -180; lon < 180; lon += Math.min(lonStep, STEP * 2)) {
+      if (isLand(lon, lat)) landPts.push(ll3d(lon, lat, 1.004));
+    }
+  }
 
+  const dotGeo  = new THREE.SphereGeometry(0.0068, 5, 5);
+  const dotMat  = new THREE.MeshBasicMaterial({ color: 0xa8b8c8 });
+  const dotMesh = new THREE.InstancedMesh(dotGeo, dotMat, landPts.length);
+  const dummy   = new THREE.Object3D();
+  landPts.forEach((pos, i) => {
+    dummy.position.copy(pos);
+    dummy.updateMatrix();
+    dotMesh.setMatrixAt(i, dummy.matrix);
+  });
+  dotMesh.instanceMatrix.needsUpdate = true;
+  globe.add(dotMesh);
+
+  // ── LOCATION MARKERS ──────────────────────────────────────────────────────
+  const markerGeo = new THREE.SphereGeometry(0.022, 12, 12);
+  const markerObjects = [];
   LOCATIONS.forEach(loc => {
-    const pos = ll3d(loc.lng, loc.lat, 1.018);
-    const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: 0xc4856a }));
+    const pos = ll3d(loc.lng, loc.lat, 1.014);
+    const dot = new THREE.Mesh(
+      markerGeo,
+      new THREE.MeshBasicMaterial({ color: 0xff3d00 })
+    );
     dot.position.copy(pos);
     globe.add(dot);
     markerObjects.push({ dot, loc });
   });
 
-  // ── DRAG + AUTO-ROTATE ────────────────────────────────────────────────────
+  // ── INTERACTION ───────────────────────────────────────────────────────────
   const raycaster = new THREE.Raycaster();
   const mouse2d   = new THREE.Vector2();
 
   let rotY = -1.83, rotX = 0.60;
   let isDragging = false, prev = { x: 0, y: 0 };
   let autoRotate = true, idleTimer = null;
-  let targetX = null, targetY = null; // for click-to-center animation
+  let targetX = null, targetY = null;
 
   function centerOn(lat, lng) {
     autoRotate = false;
@@ -102,7 +166,7 @@ import * as THREE from 'three';
     raycaster.setFromCamera(mouse2d, camera);
     const hits = raycaster.intersectObjects(markerObjects.map(m => m.dot));
     if (hits.length) {
-      const loc = markerObjects[markerObjects.map(m=>m.dot).indexOf(hits[0].object)].loc;
+      const loc = markerObjects[markerObjects.map(m => m.dot).indexOf(hits[0].object)].loc;
       centerOn(loc.lat, loc.lng);
     }
   });
@@ -123,7 +187,7 @@ import * as THREE from 'three';
     prev = { x: e.clientX, y: e.clientY };
   });
   canvas.addEventListener('touchstart', e => {
-    isDragging = true; autoRotate = false;
+    isDragging = true; autoRotate = false; targetX = null; targetY = null;
     clearTimeout(idleTimer); prev = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   }, { passive: true });
   window.addEventListener('touchend', () => {
@@ -144,10 +208,9 @@ import * as THREE from 'three';
     mouse2d.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
     mouse2d.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse2d, camera);
-    const dots = markerObjects.map(m => m.dot);
-    const hits  = raycaster.intersectObjects(dots);
+    const hits = raycaster.intersectObjects(markerObjects.map(m => m.dot));
     if (hits.length) {
-      const loc = markerObjects[dots.indexOf(hits[0].object)].loc;
+      const loc = markerObjects[markerObjects.map(m => m.dot).indexOf(hits[0].object)].loc;
       tooltip.textContent = loc.name;
       tooltip.style.opacity = '1';
       const rx = ((e.clientX - rect.left) / rect.width)  * 100;
@@ -155,8 +218,10 @@ import * as THREE from 'three';
       tooltip.style.left = `${rx}%`;
       tooltip.style.top  = `${ry}%`;
       tooltip.style.transform = 'translate(14px, -50%)';
+      canvas.style.cursor = 'pointer';
     } else {
       tooltip.style.opacity = '0';
+      canvas.style.cursor = isDragging ? 'grabbing' : 'grab';
     }
   });
   canvas.addEventListener('mouseleave', () => { tooltip.style.opacity = '0'; });
@@ -164,7 +229,6 @@ import * as THREE from 'three';
   // ── RESIZE ────────────────────────────────────────────────────────────────
   window.addEventListener('resize', () => {
     const s = window.innerHeight;
-    camera.updateProjectionMatrix();
     renderer.setSize(s, s);
   });
 
