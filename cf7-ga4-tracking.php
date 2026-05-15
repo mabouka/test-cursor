@@ -9,15 +9,47 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Prérequis : définir dans wp-config.php :
-//   define( 'GA4_MEASUREMENT_ID', 'G-XXXXXXXXXX' );
-//   define( 'GA4_API_SECRET',     'xxxxxxxxxxxxxxxxxxxx' );
-//
-// L'API Secret se crée dans GA4 :
-//   Admin → Flux de données → (votre flux) → Measurement Protocol API secrets
+// ─── Vérification des prérequis ───────────────────────────────────────────────
 
-define( 'CF7_GA4_MEASUREMENT_ID', defined( 'GA4_MEASUREMENT_ID' ) ? GA4_MEASUREMENT_ID : 'G-XXXXXXXXXX' );
-define( 'CF7_GA4_API_SECRET',     defined( 'GA4_API_SECRET' )     ? GA4_API_SECRET     : 'VOTRE_API_SECRET' );
+function cf7_ga4_is_configured() {
+    return defined( 'GA4_MEASUREMENT_ID' )
+        && defined( 'GA4_API_SECRET' )
+        && GA4_MEASUREMENT_ID !== 'G-XXXXXXXXXX'
+        && GA4_API_SECRET     !== '';
+}
+
+// Bloque l'activation si les constantes sont absentes.
+register_activation_hook( __FILE__, function () {
+    if ( ! cf7_ga4_is_configured() ) {
+        deactivate_plugins( plugin_basename( __FILE__ ) );
+        wp_die(
+            '<strong>CF7 GA4 Tracking</strong> : veuillez d\'abord ajouter dans <code>wp-config.php</code> :<br><br>'
+            . '<code>define( \'GA4_MEASUREMENT_ID\', \'G-XXXXXXXXXX\' );</code><br>'
+            . '<code>define( \'GA4_API_SECRET\',     \'votre_secret\' );</code>',
+            'Activation impossible',
+            [ 'back_link' => true ]
+        );
+    }
+} );
+
+// Affiche une notice admin si les constantes sont supprimées après activation.
+add_action( 'admin_notices', function () {
+    if ( ! cf7_ga4_is_configured() ) {
+        echo '<div class="notice notice-error"><p>'
+            . '<strong>CF7 GA4 Tracking</strong> : les constantes <code>GA4_MEASUREMENT_ID</code> et <code>GA4_API_SECRET</code> sont manquantes dans <code>wp-config.php</code>. Le tracking est désactivé.'
+            . '</p></div>';
+    }
+} );
+
+// N'enregistre le hook CF7 que si la configuration est valide.
+if ( ! cf7_ga4_is_configured() ) {
+    return;
+}
+
+// ─── Configuration ────────────────────────────────────────────────────────────
+
+define( 'CF7_GA4_MEASUREMENT_ID', GA4_MEASUREMENT_ID );
+define( 'CF7_GA4_API_SECRET',     GA4_API_SECRET );
 
 // Nom du champ radio dans CF7 (attribut "name" de la balise [radio ...]).
 define( 'CF7_GA4_RADIO_FIELD', 'enquiry-type' );
@@ -78,7 +110,7 @@ function cf7_ga4_send_event( $contact_form ) {
                 'params' => [
                     'form_id'      => $form_id,
                     'form_title'   => $contact_form->title(),
-                    'enquiry_type' => $label, // label lisible dans GA4
+                    'enquiry_type' => $label,
                 ],
             ],
         ],
@@ -88,11 +120,10 @@ function cf7_ga4_send_event( $contact_form ) {
         'headers'     => [ 'Content-Type' => 'application/json' ],
         'body'        => wp_json_encode( $payload ),
         'timeout'     => 5,
-        'blocking'    => false, // non-bloquant : n'impacte pas la vitesse du site
+        'blocking'    => false,
         'data_format' => 'body',
     ] );
 
-    // En mode debug : loguer les erreurs dans le log WordPress.
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG && is_wp_error( $response ) ) {
         error_log( '[CF7 GA4] Erreur Measurement Protocol : ' . $response->get_error_message() );
     }
@@ -100,10 +131,6 @@ function cf7_ga4_send_event( $contact_form ) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Extrait le client_id GA4 depuis le cookie _ga (format GA1.X.XXXXXXXXXX.XXXXXXXXXX).
- * Retourne un UUID v4 aléatoire si le cookie est absent.
- */
 function cf7_ga4_get_client_id() {
     if ( ! empty( $_COOKIE['_ga'] ) ) {
         $parts = explode( '.', sanitize_text_field( wp_unslash( $_COOKIE['_ga'] ) ) );
@@ -112,7 +139,6 @@ function cf7_ga4_get_client_id() {
         }
     }
 
-    // Fallback : identifiant aléatoire (pas rattaché à une session navigateur).
     return sprintf(
         '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
